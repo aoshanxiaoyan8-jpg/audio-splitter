@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Splitter (Pro Edition)</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --container-bg: #15202B;
+            --text-color: #E2E2E1;
+            --base-color: #2C3640;
+            --base-hover: #434C55;
+            --accent-color: #06BA7C;
+            --accent-hover: #37c796;
+            --border-color: #435057;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+        }
+
+        #app {
+            width: 100%;
+            max-width: 900px;
+            background-color: var(--container-bg);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-top: 0;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+
+        p.desc {
+            text-align: center;
+            color: #aaa;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+
+        #tips-zone {
+            border: 2px dashed var(--base-color);
+            border-radius: 8px;
+            padding: 5px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: rgba(17, 144, 149, 0.05);
+            margin-bottom: 5px 60px;
+        }
+
+        p.tips {
+            text-align: left;
+            color: #aaa;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+
+        #drop-zone {
+            border: 2px dashed var(--accent-color);
+            border-radius: 8px;
+            padding: 60px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: rgba(17, 144, 149, 0.05);
+            margin-bottom: 20px;
+        }
+
+        #drop-zone:hover, #drop-zone.dragover {
+            background-color: rgba(17, 144, 149, 0.15);
+        }
+
+        #drop-zone.compact {
+            padding: 15px;
+            font-size: 0.9rem;
+            border: 2px dashed var(--accent-color);
+            background-color: transparent;
+            color: #aaa;
+        }
+
+        #drop-zone.compact:hover {
+            background-color: rgba(17, 144, 149, 0.15);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        #editor-area {
+            display: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        #waveform {
+            background-color: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        #controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            justify-content: space-between;
+            background-color: rgba(17, 144, 149, 0.05);
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        button {
+            background-color: #333;
+            color: var(--text-color);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #444;
+        }
+
+        button.primary {
+            background-color: var(--accent-color);
+            color: white;
+            width: 30%;
+        }
+
+        button.primary:hover {
+            background-color: var(--accent-hover);
+        }
+
+        button.secondary {
+            background-color: var(--base-color);
+            color: white;
+            width: 30%;
+        }
+
+        button.secondary:hover {
+            background-color: var(--base-hover);
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.95rem;
+        }
+
+        input[type="range"] {
+            accent-color: var(--accent-color);
+            cursor: pointer;
+        }
+
+        #export-area {
+            text-align: center;
+            margin-top: 10px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .warning-text {
+            color: #ff9800;
+            font-size: 0.85rem;
+            margin-top: 15px;
+            margin-bottom: 0;
+        }
+
+        #loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 9999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid var(--accent-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <header>
+        <h1>Audio Splitter</h1>
+        <p class="desc">音源を読み込み、テンポを変更して指定した位置で分割保存します。<br>※ブラウザ内で完結するため、音声が外部に送信されることはありません。</p>
+    </header>
+
+    <div id="drop-zone">
+        ここへ音声ファイル(.mp3 / .wav)をドロップするか、<br>クリックしてファイルを選択してください。
+    </div>
+    <input type="file" id="file-input" accept=".mp3, .wav">
+
+    <div id="editor-area">
+        <div id="waveform"></div>
+
+        <div id="controls">
+            <button id="btn-play" class="secondary">▶ 再生 / 一時停止</button>
+            <button id="btn-add-pin" class="primary" title="ダブルクリックでピンを削除できます">✂ ここに分割点を追加</button>
+            
+            <div class="slider-container">
+                <label for="tempo-slider">テンポ: <span id="tempo-value">100</span>%</label>
+                <input type="range" id="tempo-slider" min="10" max="200" value="100">
+            </div>
+        </div>
+        <div id="tips-zone">
+            <p class="tips">✨️ TIPS ✨️<br>分割点は複数追加できます。<br>追加した分割点はドラッグで移動＆ダブルクリックで削除できます。</p>
+        </div>
+
+        <div id="export-area">
+            <button id="btn-export" class="secondary" style="width: 100%;">一括分割して保存</button>
+            <p class="desc">※複数ファイルのダウンロード許可を求めるポップアップが出た場合は「許可」してください。</p>
+        </div>
+    </div>
+</div>
+
+<div id="loading-overlay">
+    <div class="spinner"></div>
+    <div id="loading-text">音声データを処理しています... しばらくお待ちください。</div>
+</div>
+
+<script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
+<script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+
+<script type="module">
+    import { SoundTouchNode } from './index.js';
+
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const editorArea = document.getElementById('editor-area');
+    const tempoSlider = document.getElementById('tempo-slider');
+    const tempoValue = document.getElementById('tempo-value');
+    const btnPlay = document.getElementById('btn-play');
+    const btnAddPin = document.getElementById('btn-add-pin');
+    const btnExport = document.getElementById('btn-export');
+    const loadingOverlay = document.getElementById('loading-overlay');
+
+    let wavesurfer = null;
+    let wsRegions = null;
+    let originalAudioBuffer = null;
+    let originalFormat = '';
+    let originalFileName = '';
+
+    function initWaveSurfer() {
+        if (wavesurfer) wavesurfer.destroy();
+        wavesurfer = window.WaveSurfer.create({
+            container: '#waveform',
+            waveColor: '#78909c',
+            progressColor: '#1e5a99',
+            cursorColor: '#F91680',
+            barWidth: 2,
+            barRadius: 2,
+            height: 120,
+            normalize: true
+        });
+        wavesurfer.media.preservesPitch = true;
+        wsRegions = wavesurfer.registerPlugin(window.WaveSurfer.Regions.create());
+        wsRegions.on('region-double-clicked', (region, e) => { e.stopPropagation(); region.remove(); });
+    }
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length > 0) handleFile(e.target.files[0]);
+    });
+
+    async function handleFile(file) {
+        if (!file.name.toLowerCase().endsWith('.mp3') && !file.name.toLowerCase().endsWith('.wav')) {
+            alert('MP3またはWAVファイルを選択してください。');
+            return;
+        }
+        loadingOverlay.style.display = 'flex';
+        try {
+            originalFormat = file.type || (file.name.toLowerCase().endsWith('.mp3') ? 'audio/mpeg' : 'audio/wav');
+            originalFileName = file.name.substring(0, file.name.lastIndexOf('.'));
+            initWaveSurfer();
+            const arrayBuffer = await file.arrayBuffer();
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            originalAudioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+            await wavesurfer.load(URL.createObjectURL(file));
+
+            dropZone.classList.add('compact');
+            dropZone.innerHTML = '別のファイルをドロップまたはクリックで変更';
+            editorArea.style.display = 'flex';
+        } catch (error) {
+            console.error(error);
+            alert('ファイルの読み込みに失敗しました。');
+        } finally {
+            loadingOverlay.style.display = 'none';
+        }
+    }
+
+    btnPlay.addEventListener('click', () => { if (wavesurfer) wavesurfer.playPause(); });
+    tempoSlider.addEventListener('input', (e) => {
+        tempoValue.textContent = e.target.value;
+        if (wavesurfer) wavesurfer.setPlaybackRate(parseFloat(e.target.value) / 100);
+    });
+
+    btnAddPin.addEventListener('click', () => {
+        if (!wavesurfer || !wsRegions) return;
+        const time = wavesurfer.getCurrentTime();
+        const markerContent = document.createElement('div');
+        markerContent.style.cssText = 'width:2px; height:100%; background-color:#37c796; cursor:ew-resize;';
+        wsRegions.addRegion({ start: time, content: markerContent, color: 'transparent', drag: true, resize: false });
+    });
+
+    // --- Export ロジック ---
+    btnExport.addEventListener('click', async () => {
+        if (!originalAudioBuffer) return;
+
+        console.log("=== [Export] 開始 ===");
+        loadingOverlay.style.display = 'flex';
+
+        const tempAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        try {
+            const rate = parseFloat(tempoSlider.value) / 100; 
+            const sampleRate = originalAudioBuffer.sampleRate;
+            console.log(`[Export] パラメータ: Rate=${rate}, SampleRate=${sampleRate}`);
+
+            // 1. ピン（Regions）の位置を取得して、元のタイムラインでの分割点をミリ秒・サンプル単位で計算
+            const regions = wsRegions.getRegions();
+            const pins = Object.values(regions).map(r => r.start).sort((a, b) => a - b);
+            
+            const splitPoints = [0];
+            pins.forEach(pinTime => { splitPoints.push(pinTime); });
+            splitPoints.push(originalAudioBuffer.duration);
+
+            console.log(`[Export] 元音源の分割ポイント(秒):`, splitPoints);
+
+            // 2. 各区間ごとに独立して OfflineAudioContext を立ち上げてストレッチ処理を行う
+            for (let i = 0; i < splitPoints.length - 1; i++) {
+                const startSec = splitPoints[i];
+                const endSec = splitPoints[i + 1];
+                const durationSec = endSec - startSec;
+                
+                if (durationSec <= 0.02) continue; // 短すぎる区間は無視
+
+                const numSamplesOriginal = Math.floor(durationSec * sampleRate);
+                const numSamplesStretched = Math.ceil(numSamplesOriginal / rate);
+
+                // 各パート専用のコンテキストを作成
+                const partOfflineCtx = new OfflineAudioContext(
+                    originalAudioBuffer.numberOfChannels,
+                    numSamplesStretched,
+                    sampleRate
+                );
+
+                await SoundTouchNode.register(partOfflineCtx, './soundtouch-processor.js');
+                const stNode = new SoundTouchNode(partOfflineCtx);
+                stNode.playbackRate.value = rate;
+                stNode.pitch.value = 1.0;
+                // 元のバッファからこのパートの分だけを切り出す
+                const subBuffer = tempAudioCtx.createBuffer(originalAudioBuffer.numberOfChannels, numSamplesOriginal, sampleRate);
+                
+                for (let ch = 0; ch < originalAudioBuffer.numberOfChannels; ch++) {
+                    const origData = originalAudioBuffer.getChannelData(ch);
+                    const subData = subBuffer.getChannelData(ch);
+                    const startSample = Math.floor(startSec * sampleRate);
+                    subData.set(origData.subarray(startSample, startSample + numSamplesOriginal));
+                }
+
+                const source = partOfflineCtx.createBufferSource();
+                source.buffer = subBuffer;
+                source.playbackRate.value = rate;
+
+                source.connect(stNode);
+                stNode.connect(partOfflineCtx.destination);
+
+                source.start(0);
+                
+                // レンダリング実行
+                const renderedPartBuffer = await partOfflineCtx.startRendering();
+
+                // エンコードとダウンロード
+                const isWav = originalFormat.includes('wav');
+                const blob = isWav ? audioBufferToWav(renderedPartBuffer) : await audioBufferToMp3(renderedPartBuffer);
+                const ext = isWav ? 'wav' : 'mp3';
+                
+                const fileIndex = String(i + 1).padStart(2, '0');
+                downloadBlob(blob, `${originalFileName}_part${fileIndex}.${ext}`);
+                console.log(`[Export] パート ${fileIndex} （テンポ変更済）の保存に成功しました。`);
+            }
+
+        } catch (error) {
+            console.error("【詳細な書き出しエラー（生データ）】", error);
+            if (error instanceof Error) {
+                console.error("名前:", error.name);
+                console.error("メッセージ:", error.message);
+                console.error("スタックトレース:", error.stack);
+            } else {
+                console.error("オブジェクト型:", typeof error);
+                console.error("文字列化:", String(error));
+                console.dir(error);
+            }
+            alert('エラーが発生しました。コンソールログをもう一度確認してください。');
+        } finally {
+            // 使い終わったテンポラリContextを閉じる
+            if (tempAudioCtx) {
+                tempAudioCtx.close().catch(() => {});
+            }
+            loadingOverlay.style.display = 'none';
+            console.log("=== [Export] 終了 ===");
+        }
+    });
+
+    // --- Encoders ---
+    function audioBufferToWav(buffer) {
+        const numOfChan = buffer.numberOfChannels, length = buffer.length * numOfChan * 2 + 44, bufferData = new ArrayBuffer(length), view = new DataView(bufferData), channels = [];
+        let offset = 0, pos = 0;
+        function setUint16(d) { view.setUint16(offset, d, true); offset += 2; }
+        function setUint32(d) { view.setUint32(offset, d, true); offset += 4; }
+        setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157); setUint32(0x20746d66); setUint32(16); setUint16(1); setUint16(numOfChan); setUint32(buffer.sampleRate); setUint32(buffer.sampleRate * 2 * numOfChan); setUint16(numOfChan * 2); setUint16(16); setUint32(0x61746164); setUint32(length - offset - 4);
+        for (let i = 0; i < buffer.numberOfChannels; i++) channels.push(buffer.getChannelData(i));
+        while (pos < buffer.length) {
+            for (let i = 0; i < numOfChan; i++) {
+                let sample = Math.max(-1, Math.min(1, channels[i][pos]));
+                sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+                view.setInt16(offset, sample, true); offset += 2;
+            }
+            pos++;
+        }
+        return new Blob([bufferData], { type: "audio/wav" });
+    }
+
+    async function audioBufferToMp3(buffer) {
+        return new Promise((resolve) => {
+            const channels = buffer.numberOfChannels, sampleRate = buffer.sampleRate, mp3encoder = new window.lamejs.Mp3Encoder(channels, sampleRate, 192), mp3Data = [];
+            const left = buffer.getChannelData(0), right = channels > 1 ? buffer.getChannelData(1) : left, sampleBlockSize = 1152;
+            for (let i = 0; i < buffer.length; i += sampleBlockSize) {
+                const leftChunk = left.subarray(i, i + sampleBlockSize), rightChunk = right.subarray(i, i + sampleBlockSize);
+                const leftInt16 = new Int16Array(leftChunk.length), rightInt16 = new Int16Array(rightChunk.length);
+                for (let j = 0; j < leftChunk.length; j++) {
+                    leftInt16[j] = leftChunk[j] < 0 ? leftChunk[j] * 32768 : leftChunk[j] * 32767;
+                    rightInt16[j] = rightChunk[j] < 0 ? rightChunk[j] * 32768 : rightChunk[j] * 32767;
+                }
+                let mp3buf = channels === 1 ? mp3encoder.encodeBuffer(leftInt16) : mp3encoder.encodeBuffer(leftInt16, rightInt16);
+                if (mp3buf.length > 0) mp3Data.push(mp3buf);
+            }
+            const mp3buf = mp3encoder.flush();
+            if (mp3buf.length > 0) mp3Data.push(mp3buf);
+            resolve(new Blob(mp3Data, { type: 'audio/mp3' }));
+        });
+    }
+
+    function downloadBlob(blob, filename) {
+        const url = URL.createObjectURL(blob), a = document.createElement('a');
+        a.style.display = 'none'; a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click();
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+    }
+</script>
+</body>
+</html>
